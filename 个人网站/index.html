@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>吴可非 · 游戏系统策划</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+
+:root {
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --surface-glass: rgba(255,255,255,0.88);
+  --text: #2d2a26;
+  --text-light: #6b6660;
+  --accent: #e8654a;
+  --accent-dark: #d4503a;
+  --accent-soft: #fce8e3;
+  --teal: #2d8a8a;
+  --teal-soft: #e1f0f0;
+  --yellow: #f5c842;
+  --yellow-soft: #fef5d8;
+  --purple: #7c5a99;
+  --purple-soft: #f0eaf5;
+  --border: #e8e2da;
+  --radius: 14px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  --shadow-hover: 0 6px 24px rgba(0,0,0,0.12);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Noto Sans SC', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+}
+
+/* ===== 翻页容器 ===== */
+#page-container {
+  transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+}
+
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 70px 24px 50px;
+}
+.page-inner {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+.page-inner::-webkit-scrollbar { width: 4px; }
+.page-inner::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.page-inner::-webkit-scrollbar-track { background: transparent; }
+
+/* ===== 背景层 ===== */
+.bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+}
+.bg-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+/* Hero - 浅色蒙版，深字，底部渐浅让背景文字可见 */
+.bg-home { background-image: url('bg_new.png'); background-position: center bottom; }
+.bg-home .bg-overlay { background: linear-gradient(180deg, rgba(250,247,242,0.75) 0%, rgba(250,247,242,0.55) 50%, rgba(250,247,242,0.15) 85%, rgba(250,247,242,0.02) 100%); }
+/* 关于我 - 深蒙版，保证文字清晰 */
+.bg-about { background-image: url('bg_new.png'); background-position: center; }
+.bg-about .bg-overlay { background: rgba(250,247,242,0.9); }
+/* 技能 - 无文字背景 */
+.bg-skills { background-image: url('bg_new.png'); background-position: center; }
+.bg-skills .bg-overlay { background: rgba(250,247,242,0.88); }
+/* 游戏经历 */
+.bg-diary { background-image: url('bg_new.png'); background-position: center; }
+.bg-diary .bg-overlay { background: rgba(250,247,242,0.9); }
+/* 作品/项目 */
+.bg-works { background-image: url('bg_new.png'); background-position: center; }
+.bg-works .bg-overlay { background: rgba(250,247,242,0.88); }
+/* 经历 */
+.bg-40 { background-image: url('bg_new.png'); background-position: center; }
+.bg-40 .bg-overlay { background: rgba(250,247,242,0.9); }
+/* 联系我/意见箱 - 浅色蒙版，深字，底部渐浅 */
+.bg-contact { background-image: url('bg_new.png'); background-position: center bottom; }
+.bg-contact .bg-overlay { background: linear-gradient(180deg, rgba(250,247,242,0.72) 0%, rgba(250,247,242,0.5) 55%, rgba(250,247,242,0.15) 85%, rgba(250,247,242,0.02) 100%); }
+
+/* ===== 导航 ===== */
+nav {
+  position: fixed; top:0; left:0; right:0; z-index:1000;
+  background: rgba(250,247,242,0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+  transition: box-shadow .2s;
+}
+.nav-inner {
+  max-width: 960px; margin:0 auto; padding:0 24px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.nav-logo { font-weight:900; font-size:20px; color:var(--accent); letter-spacing:-0.5px; }
+.nav-links { display:flex; gap:24px; list-style:none; }
+.nav-links a {
+  text-decoration:none; color:var(--text-light); font-size:13px; font-weight:500;
+  transition: color .2s; cursor:pointer;
+}
+.nav-links a:hover, .nav-links a.active { color:var(--accent); }
+.nav-toggle { display:none; font-size:24px; background:none; border:none; cursor:pointer; color:var(--text); }
+
+/* ===== 翻页提示动画 ===== */
+.scroll-cue {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  color: var(--text-light);
+  font-size: 12px;
+  text-align: center;
+  animation: bounce 2s infinite;
+  pointer-events: none;
+}
+.scroll-cue .arrow-down { display: block; font-size: 18px; margin-top: 2px; }
+@keyframes bounce {
+  0%,100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(6px); }
+}
+.page.dark-page .scroll-cue { color: rgba(255,255,255,0.6); }
+
+/* ===== 通用 ===== */
+.section-title { font-size: 28px; font-weight:900; margin-bottom: 6px; letter-spacing:-0.5px; }
+.section-sub { color:var(--text-light); font-size:14px; margin-bottom: 24px; }
+
+/* ===== Hero ===== */
+.hero-content { color: var(--text); }
+.hero-content .hero-tag {
+  display:inline-block; background:rgba(232,101,74,0.9); color:#fff;
+  padding: 6px 14px; border-radius:20px; font-size:13px; font-weight:700;
+  margin-bottom: 18px;
+}
+.hero-content h1 {
+  font-size: 46px; font-weight:900; line-height:1.15; letter-spacing:-1px;
+  margin-bottom: 14px; text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+}
+.hero-content h1 .highlight { color: #f5c842; }
+.hero-content .tagline {
+  font-size: 19px; font-weight:500; margin-bottom: 14px;
+  font-style: italic; opacity: 0.9;
+}
+.hero-content p { font-size: 16px; opacity: 0.85; max-width: 540px; margin-bottom: 28px; }
+.hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
+.btn {
+  display:inline-block; padding: 11px 26px; border-radius:10px;
+  text-decoration:none; font-weight:700; font-size:15px; transition: all .2s;
+  cursor:pointer; border:none;
+}
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(232,101,74,0.35); }
+.btn-ghost { background:rgba(255,255,255,0.15); color:#fff; border:1.5px solid rgba(255,255,255,0.4); backdrop-filter: blur(5px); }
+.btn-ghost:hover { border-color:#fff; background:rgba(255,255,255,0.25); }
+
+/* ===== 关于我 ===== */
+.about-grid { display:grid; grid-template-columns: 1fr 1fr; gap:28px; }
+.about-text p { margin-bottom:12px; font-size:14px; }
+.about-text .quote {
+  padding: 14px 18px; background:var(--accent-soft); border-radius:10px;
+  border-left:4px solid var(--accent); margin: 14px 0; font-style:italic; font-size:14px;
+}
+.about-card {
+  background:var(--surface-glass); backdrop-filter: blur(10px);
+  border-radius:var(--radius); padding:24px;
+  box-shadow:var(--shadow); border:1px solid var(--border);
+}
+.about-card h3 { font-size:13px; color:var(--text-light); margin-bottom:14px; font-weight:500; }
+.status-item { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--border); font-size:14px; }
+.status-item:last-child { border-bottom:none; }
+.status-label { color:var(--text-light); }
+.status-value { font-weight:700; }
+
+/* ===== 技能 ===== */
+.skill-group { margin-bottom: 20px; }
+.skill-group h3 { font-size:15px; font-weight:700; margin-bottom:10px; }
+.skill-tag-group { display:flex; flex-wrap:wrap; gap:9px; }
+.skill-tag {
+  background:var(--surface-glass); border:1px solid var(--border); border-radius:10px;
+  padding: 6px 13px; font-size:13px; font-weight:500; transition: all .2s; cursor:default;
+}
+.skill-tag:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-2px); }
+.skill-tag .lv { font-size:11px; color:var(--text-light); margin-left:5px; }
+
+/* ===== 游戏经历 ===== */
+.game-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap:12px; }
+.game-card {
+  background:var(--surface-glass); backdrop-filter: blur(8px);
+  border-radius:var(--radius); overflow:hidden;
+  box-shadow:var(--shadow); border:1px solid var(--border); transition: all .25s;
+}
+.game-card:hover { box-shadow:var(--shadow-hover); transform:translateY(-4px); }
+.game-banner { height: 64px; display:flex; align-items:center; justify-content:center; font-size:26px; }
+.game-body { padding: 10px 13px; }
+.game-body h4 { font-size:14px; margin-bottom:2px; }
+.game-body p { font-size:12px; color:var(--text-light); }
+.game-badge { display:inline-block; font-size:11px; font-weight:700; padding: 2px 8px; border-radius:6px; margin-top:4px; }
+
+/* ===== 项目 ===== */
+.project-card {
+  background:var(--surface-glass); backdrop-filter: blur(10px);
+  border-radius:var(--radius); overflow:hidden;
+  box-shadow:var(--shadow); border:1px solid var(--border); margin-bottom:18px;
+}
+.project-header {
+  padding: 18px 22px; border-bottom:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;
+}
+.project-header h3 { font-size:19px; font-weight:900; margin-bottom:3px; }
+.project-meta { font-size:12px; color:var(--text-light); }
+.project-tag { display:inline-block; background:var(--accent-soft); color:var(--accent); padding:4px 11px; border-radius:6px; font-size:12px; font-weight:700; white-space:nowrap; }
+.project-body { padding: 16px 22px; }
+.project-body p { font-size:14px; margin-bottom:10px; }
+.project-features { margin: 12px 0; }
+.project-features h4 { font-size:13px; font-weight:700; margin-bottom:8px; color:var(--text-light); }
+.feature-item {
+  padding: 11px 13px; background:var(--bg); border-radius:10px;
+  border:1px solid var(--border); margin-bottom:7px; cursor:pointer; transition: all .2s;
+}
+.feature-item:hover { border-color:var(--accent); }
+.feature-item .feature-title { font-weight:700; font-size:14px; display:flex; justify-content:space-between; align-items:center; }
+.feature-item .feature-title .arrow { transition: transform .2s; font-size:12px; color:var(--text-light); }
+.feature-item.open .feature-title .arrow { transform: rotate(180deg); }
+.feature-item .feature-desc { display:none; margin-top:8px; font-size:13px; color:var(--text-light); line-height:1.6; }
+.feature-item.open .feature-desc { display:block; }
+.project-tech { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.project-tech span { font-size:11px; padding:3px 8px; border-radius:6px; background:var(--teal-soft); color:var(--teal); font-weight:600; }
+.project-links { display:flex; gap:12px; margin-top:10px; flex-wrap:wrap; }
+.project-links a { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600; transition: all .2s; }
+.project-links .demo-link { background:var(--accent); color:#fff; }
+.project-links .demo-link:hover { background:var(--accent-dark); transform:translateY(-2px); }
+
+/* ===== 时间线 ===== */
+.timeline { position:relative; padding-left:26px; }
+.timeline::before { content:''; position:absolute; left:6px; top:8px; bottom:8px; width:2px; background:var(--border); }
+.tl-item { position:relative; margin-bottom:20px; }
+.tl-item::before { content:''; position:absolute; left:-26px; top:6px; width:14px; height:14px; border-radius:50%; background:var(--surface); border:3px solid var(--accent); }
+.tl-date { font-size:13px; color:var(--accent); font-weight:700; }
+.tl-title { font-size:15px; font-weight:700; margin:2px 0; }
+.tl-desc { font-size:13px; color:var(--text-light); }
+
+/* ===== 意见箱 ===== */
+.feedback-box {
+  background:var(--surface-glass); backdrop-filter: blur(10px);
+  border-radius:var(--radius); padding:28px;
+  box-shadow:var(--shadow); border:1px solid var(--border);
+  max-width: 560px;
+}
+.feedback-intro {
+  font-size:14px; color:var(--text-light); margin-bottom:18px;
+  padding:12px 16px; background:var(--yellow-soft); border-radius:10px; border-left:4px solid var(--yellow);
+}
+.form-row { margin-bottom:14px; }
+.form-row label { display:block; font-size:13px; font-weight:600; margin-bottom:5px; }
+.form-row input, .form-row textarea, .form-row select {
+  width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px;
+  font-size:14px; font-family:inherit; background:var(--bg); transition: border-color .2s;
+}
+.form-row input:focus, .form-row textarea:focus, .form-row select:focus { outline:none; border-color:var(--accent); }
+.form-row textarea { resize:vertical; min-height:80px; }
+.form-submit { background:var(--accent); color:#fff; border:none; padding:10px 26px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; transition: all .2s; font-family:inherit; }
+.form-submit:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(232,101,74,0.35); }
+.form-note { font-size:12px; color:var(--text-light); margin-top:8px; }
+
+/* ===== Footer ===== */
+footer { text-align:center; padding: 20px 24px; border-top:1px solid var(--border); color:var(--text-light); font-size:13px; }
+footer a { color:var(--accent); text-decoration:none; }
+
+/* ===== 右侧页码指示器 ===== */
+.page-dots { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+.page-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); cursor: pointer; transition: all .2s; border: none; padding: 0; }
+.page-dot.active { background: var(--accent); transform: scale(1.3); }
+
+/* ===== 响应式 ===== */
+@media (max-width: 680px) {
+  .nav-links { display:none; }
+  .nav-toggle { display:block; }
+  .nav-links.open {
+    display:flex; flex-direction:column; position:absolute; top:100%; left:0; right:0;
+    background:var(--surface); padding:16px; gap:12px; border-bottom:1px solid var(--border); box-shadow:var(--shadow);
+  }
+  .hero-content h1 { font-size: 30px; }
+  .hero-content .tagline { font-size: 16px; }
+  .about-grid { grid-template-columns: 1fr; }
+  .page { padding: 60px 14px 40px; }
+  .section-title { font-size: 22px; }
+  .project-header { padding: 14px 16px; }
+  .project-body { padding: 12px 16px; }
+  .page-dots { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 导航 ===== -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo">吴可非</div>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+    <ul class="nav-links">
+      <li><a data-page="0">首页</a></li>
+      <li><a data-page="1">关于我</a></li>
+      <li><a data-page="2">技能</a></li>
+      <li><a data-page="3">游戏经历</a></li>
+      <li><a data-page="4">项目作品</a></li>
+      <li><a data-page="5">经历</a></li>
+      <li><a data-page="6">意见箱</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- 右侧页码指示器 -->
+<div class="page-dots" id="pageDots">
+  <button class="page-dot active" data-page="0" title="首页"></button>
+  <button class="page-dot" data-page="1" title="关于我"></button>
+  <button class="page-dot" data-page="2" title="技能"></button>
+  <button class="page-dot" data-page="3" title="游戏经历"></button>
+  <button class="page-dot" data-page="4" title="项目作品"></button>
+  <button class="page-dot" data-page="5" title="经历"></button>
+  <button class="page-dot" data-page="6" title="意见箱"></button>
+</div>
+
+<!-- ===== 翻页容器 ===== -->
+<div id="page-container">
+
+<!-- ===== P1: Hero ===== -->
+<section class="page" id="p1">
+  <div class="bg-layer bg-home"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-inner">
+    <div class="hero-content">
+      <span class="hero-tag">系统策划 · 求职中</span>
+      <h1>你好，我是<span class="highlight">吴可非</span><br>一个用demo说话的游戏设计人</h1>
+      <p class="tagline">"用可玩demo代替设计文档"</p>
+      <p>非科班出身，但对游戏叙事与系统设计有自主创作积累。借助AI工具独立将设计推进到可试玩状态，在过程中反复验证与修改假设。</p>
+      <div class="hero-btns">
+        <a class="btn btn-primary" data-page="4">看看我做了啥</a>
+        <a class="btn btn-ghost" data-page="6">给我提点建议</a>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-cue">向下滚动翻页<span class="arrow-down">▼</span></div>
+</section>
+
+<!-- ===== P2: 关于我 ===== -->
+<section class="page" id="p2">
+  <div class="bg-layer bg-about"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-inner">
+    <h2 class="section-title">关于我</h2>
+    <p class="section-sub">一些基本信息，方便你快速了解我</p>
+    <div class="about-grid">
+      <div class="about-text">
+        <p>湖北工业大学人力资源管理专业，目前正在求职游戏系统策划岗位。虽然是跨专业入行，但我认为这个背景反而给了我独特的视角——比如在《阴阳寮日常》项目中，我把人力资源管理中的"管理人"转化为"管理式神"，用组织管理的思路去设计多智能体系统。</p>
+        <div class="quote">核心方法论：不满足于把想法写在纸面上，而是借助AI工具（Claude、Cursor等）独立将设计推进到可玩状态，并在此过程中反复验证与修改假设。</div>
+        <p>对阴阳师IP有极高的热情和了解，熟悉多款游戏。英语四级518分，能流畅阅读英文设计资料。</p>
+      </div>
+      <div class="about-card">
+        <h3>当前状态</h3>
+        <div class="status-item"><span class="status-label">求职意向</span><span class="status-value">系统策划 / AI策划</span></div>
+        <div class="status-item"><span class="status-label">状态</span><span class="status-value">积极找工作</span></div>
+        <div class="status-item"><span class="status-label">教育背景</span><span class="status-value">湖北工业大学</span></div>
+        <div class="status-item"><span class="status-label">专业</span><span class="status-value">人力资源管理</span></div>
+        <div class="status-item"><span class="status-label">邮箱</span><span class="status-value">wudengfen666@gmail.com</span></div>
+        <div class="status-item"><span class="status-label">英语</span><span class="status-value">四级 518分</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-cue">继续翻页 ↓<span class="arrow-down">▼</span></div>
+</section>
+
+<!-- ===== P3: 技能 ===== -->
+<section class="page" id="p3">
+  <div class="bg-layer bg-skills"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-inner">
+    <h2 class="section-title">技能树</h2>
+    <p class="section-sub">点亮了多少技能点，一目了然</p>
+
+    <div class="skill-group">
+      <h3>游戏设计</h3>
+      <div class="skill-tag-group">
+        <span class="skill-tag">系统设计<span class="lv">★★★★☆</span></span>
+        <span class="skill-tag">叙事设计<span class="lv">★★★★</span></span>
+        <span class="skill-tag">AI Agent设计<span class="lv">★★★★</span></span>
+        <span class="skill-tag">多智能体系统<span class="lv">★★★★</span></span>
+        <span class="skill-tag">经营模拟<span class="lv">★★★☆</span></span>
+        <span class="skill-tag">Meta叙事<span class="lv">★★★★</span></span>
+      </div>
+    </div>
+
+    <div class="skill-group">
+      <h3>工具 & 引擎</h3>
+      <div class="skill-tag-group">
+        <span class="skill-tag">Cursor (Vibe Coding)<span class="lv">★★★★</span></span>
+        <span class="skill-tag">Claude<span class="lv">★★★★</span></span>
+        <span class="skill-tag">DeepSeek<span class="lv">★★★☆</span></span>
+        <span class="skill-tag">Gemini<span class="lv">★★★</span></span>
+        <span class="skill-tag">Grok<span class="lv">★★★</span></span>
+        <span class="skill-tag">HTML/CSS/JS<span class="lv">★★★</span></span>
+      </div>
+    </div>
+
+    <div class="skill-group">
+      <h3>方法论 & 软技能</h3>
+      <div class="skill-tag-group">
+        <span class="skill-tag">用demo代替文档<span class="lv">核心方法论</span></span>
+        <span class="skill-tag">多AI分工协作<span class="lv">★★★★</span></span>
+        <span class="skill-tag">跨学科视角<span class="lv">人力资源管理</span></span>
+        <span class="skill-tag">快速学习<span class="lv">★★★★☆</span></span>
+        <span class="skill-tag">文档撰写<span class="lv">★★★★</span></span>
+        <span class="skill-tag">抗压能力<span class="lv">活着就好</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-cue">继续翻页 ↓<span class="arrow-down">▼</span></div>
+</section>
+
+<!-- ===== P4: 游戏经历 ===== -->
+<section class="page" id="p4">
+  <div class="bg-layer bg-diary"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-inner">
+    <h2 class="section-title">游戏经历</h2>
+    <p class="section-sub">玩过的游戏比我改过的bug还多——大概是这样</p>
+    <div class="game-grid">
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--accent-soft);">🏮</div>
+        <div class="game-body">
+          <h4>阴阳师</h4>
+          <p>60级 · 网游活跃2年+，以此为基础设计了多智能体经营系统原型</p>
+          <span class="game-badge" style="background:var(--accent-soft);color:var(--accent);">RPG / 收集</span>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--teal-soft);">⚡</div>
+        <div class="game-body">
+          <h4>原神</h4>
+          <p>56级 · 主线推到须弥 · 网游活跃2年+，深度体验大世界探索与元素系统</p>
+          <span class="game-badge" style="background:var(--teal-soft);color:var(--teal);">开放世界 / RPG</span>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--yellow-soft);">⚔️</div>
+        <div class="game-body">
+          <h4>王者荣耀</h4>
+          <p>30级 · 网游活跃2年+，关注MOBA中的英雄设计与平衡性调整</p>
+          <span class="game-badge" style="background:var(--yellow-soft);color:#b8860b;">MOBA</span>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--purple-soft);">🛡️</div>
+        <div class="game-body">
+          <h4>明日方舟</h4>
+          <p>73级 · 网游活跃2年+，研究塔防策略深度与危机合约的词条设计</p>
+          <span class="game-badge" style="background:var(--purple-soft);color:var(--purple);">策略 / 塔防</span>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--accent-soft);">🚗</div>
+        <div class="game-body">
+          <h4>GTA系列</h4>
+          <p>关注开放世界自由度设计与玩家驱动叙事，研究其沙盒机制</p>
+          <span class="game-badge" style="background:var(--accent-soft);color:var(--accent);">开放世界 / 动作</span>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--teal-soft);">🎴</div>
+        <div class="game-body">
+          <h4>三国杀</h4>
+          <p>研究卡牌游戏中的身份博弈与技能联动设计，关注手牌管理的策略深度</p>
+          <span class="game-badge" style="background:var(--teal-soft);color:var(--teal);">卡牌 / 策略</span>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--yellow-soft);">🥷</div>
+        <div class="game-body">
+          <h4>忍者必须死</h4>
+          <p>关注横版跑酷中的操作手感与关卡设计，研究其难度曲线</p>
+          <span class="game-badge" style="background:var(--yellow-soft);color:#b8860b;">跑酷 / 动作</span>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-banner" style="background:var(--purple-soft);">🎮</div>
+        <div class="game-body">
+          <h4>更多游戏</h4>
+          <p>熟悉多款游戏的设计模式，喜欢拆解为什么有的技能树让人欲罢不能</p>
+          <span class="game-badge" style="background:var(--purple-soft);color:var(--purple);">泛游戏阅历</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="scroll-cue">继续翻页 ↓<span class="arrow-down">▼</span></div>
+</section>
+
+<!-- ===== P5: 项目作品 ===== -->
+<section class="page" id="p5">
+  <div class="bg-layer bg-works"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-inner">
+    <h2 class="section-title">项目作品</h2>
+    <p class="section-sub">两个主力项目，一个能玩的demo，一个在写的叙事实验</p>
+
+    <!-- 项目1：阴阳寮日常 -->
+    <div class="project-card">
+      <div class="project-header">
+        <div>
+          <h3>《阴阳寮日常》</h3>
+          <p class="project-meta">AI式神多智能体经营系统原型 · 2026 · 独立设计 / Vibe Coding实现</p>
+        </div>
+        <span class="project-tag">可玩Demo</span>
+      </div>
+      <div class="project-body">
+        <p>基于《阴阳师》IP世界观的多智能体经营模拟原型。探索核心问题：当式神不再是玩家指令下的执行单元，而是拥有独立目标、人格与行动权的自主智能体时，人与AI式神能碰撞出怎样的可玩性火花？</p>
+
+        <div class="project-features">
+          <h4>核心设计亮点（点击展开详情）</h4>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">请求—响应循环：式神主导型委托机制 <span class="arrow">▼</span></div>
+            <div class="feature-desc">每个式神Agent拥有独立人格设定，根据自身状态、人际关系与近期经历生成"想做的事"，通过书信主动提交给玩家。玩家操作是审阅、批准、驳回或调整资源投入。式神请求带有角色声音——酒吞偏冒险豪赌，山兔偏玩乐事务，请求内容本身即是角色塑造的载体。</div>
+          </div>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">秘书/管家 Agent <span class="arrow">▼</span></div>
+            <div class="feature-desc">独立管家Agent在玩家与大量式神间做信息聚合，将当日分散事件、请求与冲突整理为可读的"寮日报"。本质是多Agent协作机制中的总结节点，解决式神数量增多后的信息过载问题。</div>
+          </div>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">LOD（细节层级）模拟系统 <span class="arrow">▼</span></div>
+            <div class="feature-desc">借鉴3D图形学中距离决定渲染精度的思路：邻近式神逐帧详细模拟，远处事件由管家Agent以叙事摘要呈现。控制计算与叙事成本，使系统在式神数量扩张时仍可持续运行——从"能跑"走向"可扩展"的关键技术-设计联合决策。</div>
+          </div>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">经营与投资循环 <span class="arrow">▼</span></div>
+            <div class="feature-desc">式神可自主发起产业构想（如开设店铺、组织远行），玩家以投资人身份出资，承担早期亏损风险，在事业成熟后获得回报。玩家对式神的信任程度直接体现为资金投入意愿，情感关系被转译为可量化、可博弈的经营决策。</div>
+          </div>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">设计方向的关键修正 <span class="arrow">▼</span></div>
+            <div class="feature-desc">最初设定是玩家向式神分配任务——但隐含"玩家支配、式神从属"的不平等关系，与《阴阳师》IP中式神作为有血有肉伙伴的情感基调相悖。因此反转了核心交互：改为式神主动提出想做的事，玩家从"下达指令者"变为"倾听与批准者"。</div>
+          </div>
+        </div>
+
+        <div class="project-tech">
+          <span>Cursor</span><span>Vibe Coding</span><span>Multi-Agent</span><span>AI Agent</span><span>LOD</span><span>经营模拟</span>
+        </div>
+
+        <div class="project-links">
+          <a href="yinyunshi_yuntu.html" class="demo-link">▶ 试玩Demo</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 项目2：渺/Meyerage -->
+    <div class="project-card">
+      <div class="project-header">
+        <div>
+          <h3>《渺 / Meyerage》</h3>
+          <p class="project-meta">Meta向视觉小说 · 2026至今 · 主创（剧本 / 系统设计）</p>
+        </div>
+        <span class="project-tag" style="background:var(--purple-soft); color:var(--purple);">开发中</span>
+      </div>
+      <div class="project-body">
+        <p>五名飞机坠机幸存者在沙漠中求生。玩家操控男主沈攸，他拥有"反观测"能力——任何注视他的人都会被他以第三视角反向感知。游戏表面是沙漠求生，实质是一场层层剥开的Meta叙事实验。</p>
+
+        <div class="project-features">
+          <h4>核心设计亮点（点击展开详情）</h4>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">四层元叙事结构 <span class="arrow">▼</span></div>
+            <div class="feature-desc">游戏分为主线篇与真相篇。主线篇设有十余个bad end，每个结尾附有"诊断结果"为真相篇埋伏笔。真相篇触发条件：玩家在特定节点输入"我自愿参与这次全面诊断"。叙事从"玩家与角色"双层结构扩展为"玩家—角色—废稿—作者"的四层对峙。</div>
+          </div>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">反观测能力与坏结局诊断 <span class="arrow">▼</span></div>
+            <div class="feature-desc">男主沈攸因观测能力被误解为偷窥狂，此后沉默寡言。核心机制：将坏结局设计为心理诊断式反馈，搭配基于好感度的分支系统。废稿是作者早期删去的角色，保留了观测能力，长期潜伏于游戏代码中，以差评为武器要挟作者修改结局。</div>
+          </div>
+
+          <div class="feature-item" onclick="this.classList.toggle('open')">
+            <div class="feature-title">标题设计与角色一览 <span class="arrow">▼</span></div>
+            <div class="feature-desc">Meyerage——内含Eye（观测核心机制）、Mirage（海市蜃楼，核心意象）、My Rage（角色与作者共有的愤怒）。角色：沈攸（理性的疯子）、O（沙漠探险家之女）、Q（预备护士，心理晴雨表）、眼镜（贪生怕死后转为牺牲）、高个（沉默任劳）、废稿（半张脸是代码，游走叙事层与代码层之间）。</div>
+          </div>
+        </div>
+
+        <div class="project-tech">
+          <span>视觉小说</span><span>Meta叙事</span><span>分支逻辑</span><span>AI辅助</span><span>剧本设计</span>
+        </div>
+
+        <p style="margin-top:10px; font-size:13px; color:var(--text-light);">目前进度：剧情主线与分支逻辑已完成，bad end体系搭建完毕，真相篇剧本已完成核心对白设计。</p>
+      </div>
+    </div>
+
+  </div>
+  <div class="scroll-cue">继续翻页 ↓<span class="arrow-down">▼</span></div>
+</section>
+
+<!-- ===== P6: 经历时间线 ===== -->
+<section class="page" id="p6">
+  <div class="bg-layer bg-40"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-inner">
+    <h2 class="section-title">经历</h2>
+    <p class="section-sub">一条时间线，把学习和做的事情串起来</p>
+    <div class="timeline">
+
+      <div class="tl-item">
+        <div class="tl-date">2026 至今</div>
+        <div class="tl-title">《渺 / Meyerage》— 主创（剧本 / 系统设计）</div>
+        <div class="tl-desc">独立创作Meta向视觉小说，负责全部剧情设计、世界观构建、分支逻辑。剧情主线与分支逻辑已完成。</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-date">2026</div>
+        <div class="tl-title">《阴阳寮日常》— 独立设计 / Vibe Coding实现</div>
+        <div class="tl-desc">设计并用Cursor实现多智能体经营系统原型，包含请求-响应循环、管家Agent、LOD分层模拟等核心系统。Demo已发布试玩。</div>
+      </div>
+
+      <div class="tl-item">
+        <div class="tl-date">教育背景</div>
+        <div class="tl-title">湖北工业大学 · 人力资源管理专业</div>
+        <div class="tl-desc">非科班出身，但在设计中运用独特专业能力——将人力资源管理思路转化为游戏系统设计方法（如"管理人"→"管理式神"）。</div>
+      </div>
+
+    </div>
+  </div>
+  <div class="scroll-cue">继续翻页 ↓<span class="arrow-down">▼</span></div>
+</section>
+
+<!-- ===== P7: 意见箱 ===== -->
+<section class="page" id="p7">
+  <div class="bg-layer bg-contact"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-inner">
+    <h2 class="section-title">意见箱</h2>
+    <p class="section-sub">如果你有什么想说的，别客气</p>
+    <div class="feedback-box">
+      <div class="feedback-intro">
+        不管你是HR、行业前辈，还是偶然路过的好心人——如果你对我的项目、简历、或者这个网站本身有什么建议，都欢迎留个言。批评也行，但请轻喷。
+      </div>
+      <form id="feedback-form" onsubmit="return submitFeedback(event)">
+        <div class="form-row">
+          <label>怎么称呼你</label>
+          <input type="text" placeholder="比如：某地吴彦祖 / 某地刘亦菲" required>
+        </div>
+        <div class="form-row">
+          <label>你的身份</label>
+          <select>
+            <option value="">请选择（也可以不选）</option>
+            <option>HR / 招聘方</option>
+            <option>行业前辈</option>
+            <option>同行 / 同学</option>
+            <option>我只是个吃瓜的过路人</option>
+            <option>其他</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>你想说啥</label>
+          <textarea placeholder="对项目、简历、网站的任何建议都可以写在这里..." required></textarea>
+        </div>
+        <button type="submit" class="form-submit">提交建议</button>
+        <p class="form-note">注：提交后建议会通过邮件发送给我，不会公开展示</p>
+      </form>
+    </div>
+  </div>
+</section>
+
+</div>
+<!-- ===== /翻页容器 ===== -->
+
+<!-- ===== Footer ===== -->
+<footer>
+  <p>© 2026 吴可非 · 用 ❤️ 和不少头发换来的</p>
+  <p style="margin-top:6px;">邮箱：<a href="mailto:wudengfen666@gmail.com">wudengfen666@gmail.com</a></p>
+</footer>
+
+<script>
+(function() {
+  const container = document.getElementById('page-container');
+  const pages = document.querySelectorAll('.page');
+  const dots = document.querySelectorAll('.page-dot');
+  const navLinks = document.querySelectorAll('.nav-links a');
+  const totalPages = pages.length;
+  let currentPage = 0;
+  let isAnimating = false;
+  const ANIM_DURATION = 600;
+
+  // 跳转到指定页
+  function goToPage(index) {
+    if (index < 0 || index >= totalPages || isAnimating) return;
+    isAnimating = true;
+    currentPage = index;
+    container.style.transform = `translateY(-${index * 100}vh)`;
+    updateUI();
+    setTimeout(() => { isAnimating = false; }, ANIM_DURATION);
+  }
+
+  // 更新UI状态
+  function updateUI() {
+    dots.forEach((dot, i) => dot.classList.toggle('active', i === currentPage));
+    navLinks.forEach((link, i) => link.classList.toggle('active', i === currentPage));
+  }
+
+  // 暴露到全局
+  window.goToPage = goToPage;
+
+  // 导航和按钮点击
+  document.querySelectorAll('[data-page]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = parseInt(el.dataset.page);
+      goToPage(page);
+      // 关闭移动端菜单
+      document.querySelector('.nav-links').classList.remove('open');
+    });
+  });
+
+  // 滚轮翻页：一次滚动翻一页
+  let wheelTimeout = null;
+  window.addEventListener('wheel', (e) => {
+    if (isAnimating) { e.preventDefault(); return; }
+
+    // 先检查当前页内容是否可以滚动
+    const inner = pages[currentPage].querySelector('.page-inner');
+    if (inner) {
+      const canScrollDown = inner.scrollTop + inner.clientHeight < inner.scrollHeight - 2;
+      const canScrollUp = inner.scrollTop > 2;
+
+      // 内容可以滚动时，不阻止默认行为，让内容区自己滚
+      if (e.deltaY > 0 && canScrollDown) return;
+      if (e.deltaY < 0 && canScrollUp) return;
+    }
+
+    // 内容到底/到顶了，阻止默认滚动并翻页
+    e.preventDefault();
+    if (e.deltaY > 0 && currentPage < totalPages - 1) {
+      goToPage(currentPage + 1);
+    } else if (e.deltaY < 0 && currentPage > 0) {
+      goToPage(currentPage - 1);
+    }
+  }, { passive: false });
+
+  // 触摸滑动翻页（移动端）
+  let touchStartY = 0;
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (isAnimating) return;
+    const touchEndY = e.changedTouches[0].clientY;
+    const touchEndX = e.changedTouches[0].clientX;
+    const deltaY = touchStartY - touchEndY;
+    const deltaX = touchStartX - touchEndX;
+
+    // 水平滑动大于垂直时不翻页
+    if (Math.abs(deltaX) > Math.abs(deltaY)) return;
+
+    // 滑动距离太小不翻页
+    if (Math.abs(deltaY) < 40) return;
+
+    const inner = pages[currentPage].querySelector('.page-inner');
+    if (inner) {
+      const canScrollDown = inner.scrollTop + inner.clientHeight < inner.scrollHeight - 2;
+      const canScrollUp = inner.scrollTop > 2;
+      if (deltaY > 0 && canScrollDown) return;
+      if (deltaY < 0 && canScrollUp) return;
+    }
+
+    if (deltaY > 40 && currentPage < totalPages - 1) {
+      goToPage(currentPage + 1);
+    } else if (deltaY < -40 && currentPage > 0) {
+      goToPage(currentPage - 1);
+    }
+  }, { passive: true });
+
+  // 键盘翻页
+  document.addEventListener('keydown', (e) => {
+    if (isAnimating) return;
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+      e.preventDefault();
+      if (currentPage < totalPages - 1) goToPage(currentPage + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      if (currentPage > 0) goToPage(currentPage - 1);
+    }
+  });
+
+  // 意见箱提交
+  window.submitFeedback = function(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('.form-submit');
+    btn.textContent = '已收到，感谢！✓';
+    btn.style.background = 'var(--teal)';
+    setTimeout(() => {
+      e.target.reset();
+      btn.textContent = '提交建议';
+      btn.style.background = '';
+    }, 2500);
+    return false;
+  };
+})();
+</script>
+
+</body>
+</html>
